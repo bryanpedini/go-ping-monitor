@@ -37,7 +37,7 @@ func usage(errors ...string) {
 }
 
 func monit(addresses []string) {
-	pings := make(chan Ping)
+	pings := make(chan Ping, len(addresses))
 	var wg sync.WaitGroup
 	for _, addr := range addresses {
 		wg.Add(1)
