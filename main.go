@@ -5,7 +5,13 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 )
+
+type pingInfo struct {
+	host   string
+	result string
+}
 
 func main() {
 	args := os.Args[1:]
@@ -28,24 +34,32 @@ func usage(errors ...string) {
 }
 
 func monit(addresses []string) {
-	var res []chan string
-	for n := range addresses {
-		res = append(res, make(chan string))
-		go checkSrv(addresses[n], res[n])
+	pingres := make(chan pingInfo, len(addresses))
+	var wg sync.WaitGroup
+	for _, addr := range addresses {
+		wg.Add(1)
+		go checkSrv(addr, pingres, &wg)
 	}
-	prt := <-res[0]
-	fmt.Println(prt)
+	wg.Wait()
+	close(pingres) // closing the channel, not needed anymore
+	for res := range pingres {
+		fmt.Printf("%s %s", res.host, res.result)
+	}
+	fmt.Println()
 }
 
-func checkSrv(addr string, ret chan string) {
-	res, _ := exec.Command("ping", addr, "-c 3").Output()
-	if strings.Contains(string(res), "Destination Host Unreachable") ||
+func checkSrv(addr string, ret chan pingInfo, wg *sync.WaitGroup) {
+	defer wg.Done()
+	p := pingInfo{host: addr}
+	res, err := exec.Command("ping", addr, "-c 3").Output()
+	if err != nil || strings.Contains(string(res), "Destination Host Unreachable") ||
 		strings.Contains(string(res), "100% packet loss") {
-		ret <- "OFFLINE"
+		p.result = "OFFLINE"
 	} else {
 		pingRows := strings.Split(string(res), "\n")
 		pingRow := pingRows[len(pingRows)-2]
 		pingSlc := strings.Split(pingRow, "/")
-		ret <- pingSlc[len(pingSlc)-3]
+		p.result = pingSlc[len(pingSlc)-3]
 	}
+	ret <- p
 }
