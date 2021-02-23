@@ -43,26 +43,26 @@ func monit(addresses []string) {
 		wg.Add(1)
 		go checkSrv(addr, pings, &wg)
 	}
-	wg.Wait()
-	close(pings)
-	for res := range pings {
-		fmt.Printf("%s %s", res.host, res.result)
+	for {
+		res := <-pings
+		fmt.Printf("\r%s %s", res.host, res.result)
 	}
-	fmt.Println()
 }
 
 func checkSrv(addr string, ret chan Ping, wg *sync.WaitGroup) {
 	defer wg.Done()
 	p := Ping{host: addr}
-	res, err := exec.Command("ping", addr, "-c 3").Output()
-	if err != nil || strings.Contains(string(res), "Destination Host Unreachable") ||
-		strings.Contains(string(res), "100% packet loss") {
-		p.result = "OFFLINE"
-	} else {
-		pingRows := strings.Split(string(res), "\n")
-		pingRow := pingRows[len(pingRows)-2]
-		pingSlc := strings.Split(pingRow, "/")
-		p.result = pingSlc[len(pingSlc)-3]
+	for {
+		res, err := exec.Command("ping", addr, "-c 2").Output()
+		if err != nil || strings.Contains(string(res), "Destination Host Unreachable") ||
+			strings.Contains(string(res), "100% packet loss") {
+			p.result = "OFFLINE"
+		} else {
+			pingRows := strings.Split(string(res), "\n")
+			pingRow := pingRows[len(pingRows)-2]
+			pingSlc := strings.Split(pingRow, "/")
+			p.result = pingSlc[len(pingSlc)-3]
+		}
+		ret <- p
 	}
-	ret <- p
 }
