@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"sync"
 )
 
 // Ping is the join between a pingable host and its immediate result,
@@ -38,10 +37,8 @@ func usage(errors ...string) {
 
 func monit(addresses []string) {
 	pings := make(chan Ping, len(addresses))
-	var wg sync.WaitGroup
 	for _, addr := range addresses {
-		wg.Add(1)
-		go checkSrv(addr, pings, &wg)
+		go checkSrv(addr, pings)
 	}
 	for {
 		res := <-pings
@@ -49,8 +46,7 @@ func monit(addresses []string) {
 	}
 }
 
-func checkSrv(addr string, ret chan Ping, wg *sync.WaitGroup) {
-	defer wg.Done()
+func checkSrv(addr string, ret chan Ping) {
 	p := Ping{host: addr}
 	for {
 		res, err := exec.Command("ping", addr, "-c 2").Output()
