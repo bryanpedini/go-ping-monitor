@@ -5,6 +5,8 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/gosuri/uilive"
 )
 
 // Ping is the join between a pingable host and its immediate result,
@@ -37,12 +39,14 @@ func usage(errors ...string) {
 
 func monit(addresses []string) {
 	pings := make(chan Ping, len(addresses))
+	w := uilive.New()
+	w.Start()
 	for _, addr := range addresses {
 		go checkSrv(addr, pings)
 	}
 	for {
 		res := <-pings
-		fmt.Printf("\r%s %s", res.host, res.result)
+		fmt.Fprintf(w, "\r%s %s", res.host, res.result)
 	}
 }
 
