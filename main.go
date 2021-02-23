@@ -8,13 +8,16 @@ import (
 	"sync"
 )
 
-type pingInfo struct {
+// Ping is the join between a pingable host and its immediate result,
+// it is updated over time.
+type Ping struct {
 	host   string
 	result string
 }
 
 func main() {
 	args := os.Args[1:]
+	// checking for at least one provided target
 	if len(args) == 0 {
 		usage("No monit target was provided.", "")
 		os.Exit(1)
@@ -34,23 +37,23 @@ func usage(errors ...string) {
 }
 
 func monit(addresses []string) {
-	pingres := make(chan pingInfo, len(addresses))
+	pings := make(chan Ping)
 	var wg sync.WaitGroup
 	for _, addr := range addresses {
 		wg.Add(1)
-		go checkSrv(addr, pingres, &wg)
+		go checkSrv(addr, pings, &wg)
 	}
 	wg.Wait()
-	close(pingres) // closing the channel, not needed anymore
-	for res := range pingres {
+	close(pings)
+	for res := range pings {
 		fmt.Printf("%s %s", res.host, res.result)
 	}
 	fmt.Println()
 }
 
-func checkSrv(addr string, ret chan pingInfo, wg *sync.WaitGroup) {
+func checkSrv(addr string, ret chan Ping, wg *sync.WaitGroup) {
 	defer wg.Done()
-	p := pingInfo{host: addr}
+	p := Ping{host: addr}
 	res, err := exec.Command("ping", addr, "-c 3").Output()
 	if err != nil || strings.Contains(string(res), "Destination Host Unreachable") ||
 		strings.Contains(string(res), "100% packet loss") {
